@@ -1,177 +1,107 @@
-# Marvel Rivals --- Hero Pick-Rate & Win-Rate Analysis
+# Marvel Rivals Hot List — Role-Standardized Hero Scores & Tier List (Season 6)
 
-This project analyzes **Marvel Rivals heroes** using:
+This project takes a scraped **Marvel Rivals Hot List (Season 6)** dataset and creates:
 
--   **Hero name**
--   **Pick rate**
--   **Win rate**
--   **Platform** (PC / Console)
--   **Rank brackets** (Bronze → Grandmaster)
+1. A **role-standardized** dataset that accounts for different numbers of heroes per role (which can inflate pick rates).
+2. A **composite hero score** based on pick rate + win rate.
+3. A **tier list** (S/A/B/C/D) generated from the hero score.
 
-The goal is to understand:
+---
 
--   which heroes are **popular AND strong**,\
--   which heroes are **over-picked but under-performing**,\
--   and which heroes are **underrated sleepers** that win more than
-    they're played.
+## What This Script Does
 
-The project is written in **Python** using **Pandas** for data analysis
-and (optionally) Matplotlib for visualizations.
+### 1) Load Data
+Reads the Season 6 CSV:
 
-------------------------------------------------------------------------
+- **Input:** `marvel_rivals_hot_list_season_6.csv`
 
-## 📂 Dataset
+### 2) Convert Percent Columns to Decimals
+The dataset includes percent columns:
 
-Your main CSV is expected to look like:
+- `Pick Rate (%)` → `Pick Rate` as a decimal
+- `Win Rate (%)` → `Win Rate` as a decimal
 
-  Hero     Platform   Rank       Pick Rate   Win Rate   Game Mode     Role
-  -------- ---------- ---------- ----------- ---------- ------------- ----------
-  Angela   PC         Bronze     0.0684      0.5282     Competitive   Vanguard
-  Hulk     PC         Platinum   0.113       0.541      Competitive   Vanguard
-  Storm    PC         Bronze     0.0135      0.5422     Competitive   Duelist
+Example:
+- `12.5%` becomes `0.125`
 
-> Pick/Win rates are decimals (e.g., `0.52 = 52%`).
+### 3) Standardize Pick Rate by Role
+Pick rates can look “inflated” in roles with fewer heroes. To fix this, the script standardizes pick rate within each role.
 
-File name:
+It computes:
 
-    hero_stats.csv
+- **Role mean pick rate**
+  - `role_mean_pick`: mean `Pick Rate` within each `Role`
+- **Role-normalized pick rate**
+  - `pick_norm = Pick Rate / role_mean_pick`
+  - Interpretation:
+    - `1.0` = average pick rate for that role
+    - `>1.0` = above-average popularity for that role
+    - `<1.0` = below-average popularity for that role
+- **Within-role z-scores**
+  - `pick_z`: pick rate z-score within each role
+  - `win_z`: win rate z-score within each role  
+  Z-score meaning:
+  - `0` = average within role
+  - `+1` = 1 standard deviation above role average
+  - `-1` = 1 standard deviation below role average
 
-Place it in the same folder as `analysis.py`.
+### 4) Compute Hero Score
+Creates a weighted composite score:
 
-------------------------------------------------------------------------
+- `hero_score = 0.6 * pick_z + 0.4 * win_z`
 
-## 🚀 Features
+Weights can be adjusted depending on whether you want the score to emphasize **meta popularity** (pick rate) or **performance** (win rate).
 
-### ✔️ Sort heroes by platform → rank → win rate
+### 5) Export Standardized Dataset
+Exports a clean dataset with the main metrics:
 
-Organizes meta trends clearly across ladders and devices.
+- **Output:** `marvel_rivals_standardized.csv`
 
-### ✔️ Pick-rate vs Win-rate comparison
+Columns included:
+- `Hero Name`, `Role`, `Rank`, `Pick Rate`, `Win Rate`
+- `pick_norm`, `pick_z`, `win_z`, `hero_score`
 
-Identifies:
+### 6) Create Tier List
+Assigns tiers using hero score thresholds:
 
--   🟢 **Meta monsters** (high pick, high win)\
--   🔵 **Underrated heroes** (low pick, high win)\
--   🟡 **Over-picked but weak**\
--   🔴 **Low pick & low win**
+| Tier | hero_score range |
+|------|------------------|
+| S    | ≥ 1.0            |
+| A    | 0.3 to < 1.0     |
+| B    | -0.3 to < 0.3    |
+| C    | -1.0 to < -0.3   |
+| D    | < -1.0           |
 
-### ✔️ Outlier-aware classification
+Exports a tier list CSV:
 
-Uses **median** by default (robust to skewed data), but supports
-**mean** if preferred.
+- **Output:** `marvel_rivals_tier_list.csv`
 
-### ✔️ Optional scatter plot visualization
+---
 
-Visualizes hero power vs popularity.
+## Files
 
-------------------------------------------------------------------------
+### Input
+- `marvel_rivals_hot_list_season_6.csv`
 
-## 🛠️ Installation
+Expected columns in the input CSV:
+- `Hero Name`
+- `Role`
+- `Rank`
+- `Pick Rate (%)`
+- `Win Rate (%)`
 
-### 1️⃣ Clone the repo
+### Outputs
+- `marvel_rivals_standardized.csv`  
+  Standardized metrics including z-scores and hero_score.
 
-``` bash
-git clone https://github.com/<your-username>/marvel-rivals-analysis.git
-cd marvel-rivals-analysis
-```
+- `marvel_rivals_tier_list.csv`  
+  Tier list output containing: `Hero Name`, `Role`, `Rank`, `Pick Rate`, `Win Rate`, `hero_score`, `tier`
 
-### 2️⃣ Create / activate environment (Anaconda example)
+---
 
-``` bash
-conda create -n dev python=3.11
-conda activate dev
-```
+## Requirements
 
-### 3️⃣ Install dependencies
+Install dependencies:
 
-``` bash
-pip install pandas matplotlib
-```
-
-------------------------------------------------------------------------
-
-## ▶️ Running the analysis
-
-Run the script:
-
-``` bash
-python analysis.py
-```
-
-You should see output such as:
-
-    Top by win rate (organized):
-    Rocket Raccoon ... 0.5705
-    Peni Parker ...    0.5678
-    Magik ...
-
-------------------------------------------------------------------------
-
-## 📊 Pick-Rate vs Win-Rate Insights
-
-The script highlights:
-
-### Over-picked but under-performing
-
-Players select them a lot --- but lose:
-
-``` python
-overpicked = df[
-    (df["Pick Rate"] > df["Pick Rate"].median()) &
-    (df["Win Rate"] < df["Win Rate"].median())
-]
-```
-
-### Underrated strong heroes
-
-Low play, high success:
-
-``` python
-underrated = df[
-    (df["Pick Rate"] < df["Pick Rate"].median()) &
-    (df["Win Rate"] > df["Win Rate"].median())
-]
-```
-
-You can switch to **mean** if desired by replacing `.median()` with
-`.mean()`.
-
-------------------------------------------------------------------------
-
-## 📈 Visualization (optional)
-
-Run to visualize pick vs win:
-
-``` python
-plt.scatter(df["Pick Rate"], df["Win Rate"])
-...
-plt.show()
-```
-
-This helps spot:
-
--   top-right = meta,
--   top-left = sleepers,
--   bottom-right = overrated,
--   bottom-left = weak.
-
-------------------------------------------------------------------------
-
-## 🔮 Future ideas
-
--   pull stats automatically from APIs / web scraping\
--   role-based comparisons\
--   patch-to-patch balance tracking\
--   dashboard (Streamlit)
-
-------------------------------------------------------------------------
-
-## 🤝 Contributing
-
-PRs and suggestions welcome!
-
-------------------------------------------------------------------------
-
-## 📜 License
-
-MIT --- feel free to use, modify, and build on this.
+```bash
+pip install pandas numpy
