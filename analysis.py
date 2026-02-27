@@ -25,8 +25,8 @@ df['win_z'] = df.groupby('Role')['Win Rate'].transform(
 )
 
 #Calculate hero scores
-pick_weight = 0.6
-win_weight = 0.4
+pick_weight = 0.5
+win_weight = 0.5
 
 df['hero_score'] = (
     pick_weight * df['pick_z'] +
